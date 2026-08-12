@@ -1,26 +1,59 @@
 name: build-address-index
 
 on:
-  workflow_dispatch:   # manueller Start-Button im Actions-Tab
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - geofabrik: baden-wuerttemberg
+            output: baden-wuerttemberg
+          - geofabrik: bayern
+            output: bayern
+          - geofabrik: brandenburg
+            output: berlin_brandenburg
+          - geofabrik: hamburg
+            output: hamburg
+          - geofabrik: hessen
+            output: hessen
+          - geofabrik: mecklenburg-vorpommern
+            output: mecklenburg-vorpommern
+          - geofabrik: niedersachsen
+            output: niedersachsen_bremen
+          - geofabrik: nordrhein-westfalen
+            output: nordrhein-westfalen
+          - geofabrik: rheinland-pfalz
+            output: rheinland-pfalz
+          - geofabrik: saarland
+            output: saarland
+          - geofabrik: sachsen-anhalt
+            output: sachsen-anhalt
+          - geofabrik: sachsen
+            output: sachsen
+          - geofabrik: schleswig-holstein
+            output: schleswig-holstein
+          - geofabrik: thueringen
+            output: thueringen
+
     steps:
       - name: osmium installieren
         run: sudo apt-get update && sudo apt-get install -y osmium-tool sqlite3
 
-      - name: Brandenburg-Extrakt laden
-        run: curl -L -o brandenburg.osm.pbf https://download.geofabrik.de/europe/germany/brandenburg-latest.osm.pbf
+      - name: ${{ matrix.geofabrik }}-Extrakt laden
+        run: curl -L -o region.osm.pbf https://download.geofabrik.de/europe/germany/${{ matrix.geofabrik }}-latest.osm.pbf
 
       - name: Download prüfen
         run: |
-          ls -lh brandenburg.osm.pbf
-          file brandenburg.osm.pbf
+          ls -lh region.osm.pbf
+          file region.osm.pbf
 
       - name: Adressierbare Objekte extrahieren (GeoJSON)
         run: |
-          osmium tags-filter brandenburg.osm.pbf \
+          osmium tags-filter region.osm.pbf \
             w/highway w/addr:housenumber n/place \
             -o gefiltert.osm.pbf
           osmium export gefiltert.osm.pbf -o adressen.geojson
@@ -64,5 +97,5 @@ jobs:
       - name: Datenbank als Artefakt hochladen
         uses: actions/upload-artifact@v4
         with:
-          name: adressen-brandenburg
+          name: ${{ matrix.output }}
           path: adressen.sqlite
