@@ -51,12 +51,12 @@ jobs:
           ls -lh region.osm.pbf
           file region.osm.pbf
 
-      - name: Adressierbare Objekte extrahieren (GeoJSON)
+      - name: Adressierbare Objekte extrahieren (GeoJSON, zeilenweise)
         run: |
           osmium tags-filter region.osm.pbf \
             w/highway w/addr:housenumber n/place \
             -o gefiltert.osm.pbf
-          osmium export gefiltert.osm.pbf -o adressen.geojson
+          osmium export gefiltert.osm.pbf -f geojsonseq -o adressen.geojsonseq
 
       - name: SQLite-Datenbank mit FTS5 bauen
         run: |
@@ -79,18 +79,23 @@ jobs:
 
           db = sqlite3.connect('adressen.sqlite')
           db.execute('CREATE VIRTUAL TABLE adressen USING fts5(name, typ, lat, lon)')
-          with open('adressen.geojson') as f:
-              daten = json.load(f)
-          for feature in daten['features']:
-              props = feature['properties']
-              name = props.get('name') or props.get('addr:street')
-              if not name:
-                  continue
-              punkt = get_point(feature['geometry'])
-              if punkt is None:
-                  continue
-              lon, lat = punkt
-              db.execute('INSERT INTO adressen VALUES (?,?,?,?)', (name, props.get('highway') or props.get('place'), lat, lon))
+
+          with open('adressen.geojsonseq') as f:
+              for zeile in f:
+                  zeile = zeile.strip().lstrip(chr(30))
+                  if not zeile:
+                      continue
+                  feature = json.loads(zeile)
+                  props = feature.get('properties', {})
+                  name = props.get('name') or props.get('addr:street')
+                  if not name:
+                      continue
+                  punkt = get_point(feature['geometry'])
+                  if punkt is None:
+                      continue
+                  lon, lat = punkt
+                  db.execute('INSERT INTO adressen VALUES (?,?,?,?)', (name, props.get('highway') or props.get('place'), lat, lon))
+
           db.commit()
           "
 
