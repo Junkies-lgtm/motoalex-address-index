@@ -1,0 +1,48 @@
+name: build-address-index
+
+on:
+  workflow_dispatch:   # manueller Start-Button im Actions-Tab
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: osmium installieren
+        run: sudo apt-get update && sudo apt-get install -y osmium-tool sqlite3
+
+      - name: Brandenburg-Extrakt laden
+        run: curl -o brandenburg.osm.pbf https://download.geofabrik.de/europe/germany/brandenburg-latest.osm.pbf
+
+      - name: Adressierbare Objekte extrahieren (GeoJSON)
+        run: |
+          osmium tags-filter brandenburg.osm.pbf \
+            w/highway w/addr:housenumber n/place \
+            -o gefiltert.osm.pbf
+          osmium export gefiltert.osm.pbf -o adressen.geojson
+
+      - name: SQLite-Datenbank mit FTS5 bauen
+        run: |
+          python3 -c "
+          import json, sqlite3
+          db = sqlite3.connect('adressen.sqlite')
+          db.execute('CREATE VIRTUAL TABLE adressen USING fts5(name, typ, lat, lon)')
+          with open('adressen.geojson') as f:
+              daten = json.load(f)
+          for feature in daten['features']:
+              props = feature['properties']
+              name = props.get('name') or props.get('addr:street')
+              if not name:
+                  continue
+              geom = feature['geometry']
+              if geom['type'] != 'Point':
+                  continue
+              lon, lat = geom['coordinates']
+              db.execute('INSERT INTO adressen VALUES (?,?,?,?)', (name, props.get('highway') or props.get('place'), lat, lon))
+          db.commit()
+          "
+
+      - name: Datenbank als Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: adressen-brandenburg
+          path: adressen.sqlite
