@@ -12,10 +12,11 @@ jobs:
 
       - name: Brandenburg-Extrakt laden
         run: curl -L -o brandenburg.osm.pbf https://download.geofabrik.de/europe/germany/brandenburg-latest.osm.pbf
+
       - name: Download prüfen
         run: |
           ls -lh brandenburg.osm.pbf
-          file brandenburg.osm.pbf  
+          file brandenburg.osm.pbf
 
       - name: Adressierbare Objekte extrahieren (GeoJSON)
         run: |
@@ -28,6 +29,21 @@ jobs:
         run: |
           python3 -c "
           import json, sqlite3
+
+          def get_point(geom):
+              t = geom['type']
+              coords = geom['coordinates']
+              if t == 'Point':
+                  return coords
+              if t == 'LineString':
+                  return coords[len(coords)//2]
+              if t == 'Polygon':
+                  ring = coords[0]
+                  lon = sum(p[0] for p in ring) / len(ring)
+                  lat = sum(p[1] for p in ring) / len(ring)
+                  return [lon, lat]
+              return None
+
           db = sqlite3.connect('adressen.sqlite')
           db.execute('CREATE VIRTUAL TABLE adressen USING fts5(name, typ, lat, lon)')
           with open('adressen.geojson') as f:
@@ -37,10 +53,10 @@ jobs:
               name = props.get('name') or props.get('addr:street')
               if not name:
                   continue
-              geom = feature['geometry']
-              if geom['type'] != 'Point':
+              punkt = get_point(feature['geometry'])
+              if punkt is None:
                   continue
-              lon, lat = geom['coordinates']
+              lon, lat = punkt
               db.execute('INSERT INTO adressen VALUES (?,?,?,?)', (name, props.get('highway') or props.get('place'), lat, lon))
           db.commit()
           "
