@@ -76,7 +76,7 @@ jobs:
             -o gefiltert.osm.pbf
           osmium export gefiltert.osm.pbf -f geojsonseq -o adressen.geojsonseq
 
-      - name: SQLite-Datenbank mit FTS5 bauen
+      - name: SQLite-Datenbank mit FTS4 bauen
         run: |
           python3 -c "
           import json, sqlite3
@@ -96,7 +96,7 @@ jobs:
               return None
 
           db = sqlite3.connect('adressen.sqlite')
-          db.execute('CREATE VIRTUAL TABLE adressen USING fts5(name, typ, lat, lon)')
+          db.execute('CREATE VIRTUAL TABLE adressen USING fts4(name, typ, lat, lon)')
 
           with open('adressen.geojsonseq') as f:
               for zeile in f:
