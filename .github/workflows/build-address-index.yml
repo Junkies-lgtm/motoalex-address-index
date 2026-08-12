@@ -3,8 +3,24 @@ name: build-address-index
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write   # noetig, damit der Workflow Release-Assets hochladen darf
+
 jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Release anlegen oder aktualisieren
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-address-index
+          name: Adressdatenbanken (aktuell)
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
+    needs: prepare-release
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -46,7 +62,7 @@ jobs:
       - name: ${{ matrix.geofabrik }}-Extrakt laden
         run: curl -L -o region.osm.pbf https://download.geofabrik.de/europe/germany/${{ matrix.geofabrik }}-latest.osm.pbf
 
-      - name: Download prüfen
+      - name: Download pruefen
         run: |
           ls -lh region.osm.pbf
           file region.osm.pbf
@@ -99,8 +115,13 @@ jobs:
           db.commit()
           "
 
-      - name: Datenbank als Artefakt hochladen
-        uses: actions/upload-artifact@v4
+      - name: Datenbank umbenennen
+        run: cp adressen.sqlite ${{ matrix.output }}.sqlite
+
+      - name: Als Release-Asset hochladen
+        uses: softprops/action-gh-release@v2
         with:
-          name: ${{ matrix.output }}
-          path: adressen.sqlite
+          tag_name: latest-address-index
+          files: ${{ matrix.output }}.sqlite
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
