@@ -96,7 +96,7 @@ jobs:
               return None
 
           db = sqlite3.connect('adressen.sqlite')
-          db.execute('CREATE VIRTUAL TABLE adressen USING fts4(name, typ, lat, lon)')
+          db.execute('CREATE VIRTUAL TABLE adressen USING fts4(strasse, hausnummer, ort, plz, lat, lon)')
 
           with open('adressen.geojsonseq') as f:
               for zeile in f:
@@ -105,14 +105,25 @@ jobs:
                       continue
                   feature = json.loads(zeile)
                   props = feature.get('properties', {})
-                  name = props.get('name') or props.get('addr:street')
-                  if not name:
+
+                  strasse = props.get('addr:street')
+                  ort = props.get('addr:city')
+                  hausnummer = props.get('addr:housenumber', '')
+                  plz = props.get('addr:postcode', '')
+
+                  # Objekte ohne Strasse+Ort ueberspringen - ohne beides ist der Datensatz fuer die zweistufige Suche nutzlos
+                  if not strasse or not ort:
                       continue
+
                   punkt = get_point(feature['geometry'])
                   if punkt is None:
                       continue
                   lon, lat = punkt
-                  db.execute('INSERT INTO adressen VALUES (?,?,?,?)', (name, props.get('highway') or props.get('place'), lat, lon))
+
+                  db.execute(
+                      'INSERT INTO adressen VALUES (?,?,?,?,?,?)',
+                      (strasse, hausnummer, ort, plz, lat, lon)
+                  )
 
           db.commit()
           "
