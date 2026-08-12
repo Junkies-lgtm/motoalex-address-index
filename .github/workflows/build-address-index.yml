@@ -11,7 +11,11 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y osmium-tool sqlite3
 
       - name: Brandenburg-Extrakt laden
-        run: curl -o brandenburg.osm.pbf https://download.geofabrik.de/europe/germany/brandenburg-latest.osm.pbf
+        run: curl -L -o brandenburg.osm.pbf https://download.geofabrik.de/europe/germany/brandenburg-latest.osm.pbf
+      - name: Download prüfen
+        run: |
+          ls -lh brandenburg.osm.pbf
+          file brandenburg.osm.pbf  
 
       - name: Adressierbare Objekte extrahieren (GeoJSON)
         run: |
